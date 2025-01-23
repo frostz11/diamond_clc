@@ -30,28 +30,14 @@ const DiamondCalculator = () => {
 
   const [diamonds, setDiamonds] = useState<DiamondState[]>([{...initialDiamondState}]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
-  // Base price per carat
-  const basePrice: number = 23750;
-  
-  const clarityMultipliers: DiamondCharacteristics = {
-    'FL': 2.0, 'IF': 1.8, 'VVS1': 1.6, 'VVS2': 1.5,
-    'VS1': 1.4, 'VS2': 1.3, 'SI1': 1.2, 'SI2': 1.1, 'I1': 0.9,
-  };
-
-  const colorMultipliers: DiamondCharacteristics = {
-    'D': 1.8, 'E': 1.6, 'F': 1.4, 'G': 1.3,
-    'H': 1.2, 'I': 1.1, 'J': 1.0, 'K': 0.9,
-  };
-
-  const cutMultipliers: DiamondCharacteristics = {
-    'Excellent': 1.5, 'Very Good': 1.3, 'Good': 1.1,
-    'Fair': 0.9, 'Poor': 0.7,
-  };
-
-  const certificationMultipliers: DiamondCharacteristics = {
-    'GIA': 1.3, 'AGS': 1.25, 'IGI': 1.1, 'HRD': 1.2, 'None': 1.0
-  };
+  // These constants are kept for the select options, but calculation is moved to backend
+  const clarityOptions = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1'];
+  const colorOptions = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+  const cutOptions = ['Excellent', 'Very Good', 'Good', 'Fair', 'Poor'];
+  const certificationOptions = ['GIA', 'AGS', 'IGI', 'HRD', 'None'];
 
   const addDiamond = () => {
     setDiamonds([...diamonds, { ...initialDiamondState, carat: '0.5' }]);
@@ -69,19 +55,37 @@ const DiamondCalculator = () => {
     setDiamonds(newDiamonds);
   };
 
-  const calculateDiamondPrice = (diamond: DiamondState): number => {
-    const caratValue = parseFloat(diamond.carat);
-    const clarityMultiplier = clarityMultipliers[diamond.clarity];
-    const colorMultiplier = colorMultipliers[diamond.color];
-    const cutMultiplier = cutMultipliers[diamond.cut];
-    const certificationMultiplier = certificationMultipliers[diamond.certification];
+  const calculateTotalPrice = async (): Promise<void> => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/calculate-price', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          diamonds: diamonds.map(diamond => ({
+            ...diamond,
+            carat: parseFloat(diamond.carat)
+          }))
+        })
+      });
 
-    return basePrice * caratValue * clarityMultiplier * colorMultiplier * cutMultiplier * certificationMultiplier;
-  };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to calculate price');
+      }
 
-  const calculateTotalPrice = (): void => {
-    const total = diamonds.reduce((sum, diamond) => sum + calculateDiamondPrice(diamond), 0);
-    setTotalPrice(Math.round(total));
+      const data = await response.json();
+      setTotalPrice(data.total_price);
+    } catch (error) {
+      console.error('Error calculating price:', error);
+      setError(error instanceof Error ? error.message : 'Failed to calculate price');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const DiamondInputs = ({ diamond, index, isOnly }: { 
@@ -127,7 +131,7 @@ const DiamondCalculator = () => {
             onChange={(e) => updateDiamond(index, { clarity: e.target.value })}
             className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
           >
-            {Object.keys(clarityMultipliers).map((c) => (
+            {clarityOptions.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -140,7 +144,7 @@ const DiamondCalculator = () => {
             onChange={(e) => updateDiamond(index, { color: e.target.value })}
             className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
           >
-            {Object.keys(colorMultipliers).map((c) => (
+            {colorOptions.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -153,7 +157,7 @@ const DiamondCalculator = () => {
             onChange={(e) => updateDiamond(index, { cut: e.target.value })}
             className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
           >
-            {Object.keys(cutMultipliers).map((c) => (
+            {cutOptions.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -166,7 +170,7 @@ const DiamondCalculator = () => {
             onChange={(e) => updateDiamond(index, { certification: e.target.value })}
             className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
           >
-            {Object.keys(certificationMultipliers).map((c) => (
+            {certificationOptions.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -213,12 +217,19 @@ const DiamondCalculator = () => {
 
                 <button 
                   onClick={calculateTotalPrice}
-                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors shadow-lg"
+                  disabled={isLoading}
+                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Calculator className="w-5 h-5" />
-                  Calculate Total Price
+                  {isLoading ? 'Calculating...' : 'Calculate Total Price'}
                 </button>
               </div>
+
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-600">
+                  {error}
+                </div>
+              )}
 
               {totalPrice > 0 && (
                 <div className="mt-6 p-6 bg-white/80 rounded-lg border border-gray-200 shadow-lg backdrop-blur-sm">
