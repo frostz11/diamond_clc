@@ -1,5 +1,5 @@
 // app/page.tsx
-import DiamondCalculator from '@/components/DiamondCalculator';
+import DiamondCalculator from '@/app/diamond-calculator/page';
 import React from 'react';
 
 export default function Home(): React.ReactElement {
