@@ -68,30 +68,32 @@ export default function CredentialsPage() {
     };
 
     // Log login activity
-    const logLoginActivity = async (success: boolean, details: string) => {
-        try {
-          const response = await fetch('http://127.0.0.1:8000/api/login-logs/', { 
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                staff_id: id,
-                branch,
-                counter,
-                success,
-                details,
-            }),
-        });
-
-            if (!response.ok) {
-                console.error('Failed to log login activity');
-            }
-        } catch (error) {
-            console.error('Error logging login activity:', error);
-        }
-    };
-
+    const logLoginActivity = async (id: string, branch: string, counter: string, success: boolean, details: string) => {
+      try {
+          const response = await fetch('http://127.0.0.1:8000/api/log-activity/', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  staff_id: id,
+                  branch: branch,
+                  counter: counter,
+                  success: success,
+                  details: details
+              }),
+          });
+  
+          if (!response.ok) {
+              const errorText = await response.text();
+              console.error('Failed to log activity:', response.status, errorText);
+              throw new Error('Failed to log activity');
+          }
+      } catch (error) {
+          console.error('Error logging activity:', error);
+          // Don't throw here - we don't want login to fail if logging fails
+      }
+  };
     // Fetch login logs
     const fetchLoginLogs = async () => {
         if (!isAdmin || id !== "admin") return;
@@ -127,58 +129,51 @@ export default function CredentialsPage() {
 
     // Handle login
     const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        setTouched({
-            id: true,
-            password: true,
-            counter: true
-        });
-
-        if (!id || !password || !counter) {
-            setError("Please fill in all required fields");
-            return;
-        }
-
-        setIsLoading(true);
-        setError("");
-
-        try {
-            await new Promise(resolve => setTimeout(resolve, 800));
-            
-            const customPassword = localStorage.getItem(`password_${id}`);
-            const correctPassword = customPassword || "password123";
-
-            if (id === "admin" && password === correctPassword) {
-                setIsAdmin(true);
-                
-                if (rememberMe) {
-                    localStorage.setItem("rememberedId", id);
-                    localStorage.setItem("rememberedBranch", branch);
-                    localStorage.setItem("rememberedCounter", counter);
-                } else {
-                    localStorage.removeItem("rememberedId");
-                    localStorage.removeItem("rememberedBranch");
-                    localStorage.removeItem("rememberedCounter");
-                }
-
-                localStorage.setItem("authenticated", "true");
-                localStorage.setItem("userBranch", branch);
-                localStorage.setItem("counterNo", counter);
-                
-                await logLoginActivity(true, "Successful login");
-                router.push("/diamond-calculator");
-            } else {
-                setError("Invalid credentials. Please check your Staff ID and password.");
-                await logLoginActivity(false, "Invalid credentials");
-            }
-        } catch (err) {
-            setError("Network error. Please check your connection and try again.");
-            await logLoginActivity(false, "Network error");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+      e.preventDefault();
+      setIsLoading(true);
+      setError("");
+  
+      try {
+          const response = await fetch('http://localhost:8000/api/login', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  staff_id: id,
+                  branch: branch,
+                  counter: counter
+              }),
+          });
+  
+          const data = await response.json();
+  
+          if (response.ok) {
+              // Store the API key properly
+              localStorage.setItem('api_key', data.api_key);
+              localStorage.setItem('authenticated', 'true');
+              localStorage.setItem('userBranch', branch);
+              localStorage.setItem('counterNo', counter);
+  
+              if (rememberMe) {
+                  localStorage.setItem('rememberedId', id);
+                  localStorage.setItem('rememberedBranch', branch);
+                  localStorage.setItem('rememberedCounter', counter);
+              }
+  
+              await logLoginActivity(id, branch, counter, true, "Successful login");
+              router.push("/diamond-calculator");
+          } else {
+              setError(data.detail || "Invalid credentials");
+              await logLoginActivity(id, branch, counter, false, "Invalid credentials");
+          }
+      } catch (error) {
+          setError("Network error. Please try again.");
+          await logLoginActivity(id, branch, counter, false, "Network error");
+      } finally {
+          setIsLoading(false);
+      }
+  };
 
   // Update the ActivityLog component to use the fetched logs
   const ActivityLog: React.FC = () => {

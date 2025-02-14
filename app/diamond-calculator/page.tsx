@@ -20,17 +20,21 @@ const DiamondCalculator = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem("authenticated") === "true";
-    if (!isAuthenticated) {
-      router.push("/credentials");
-    } else {
-      setIsLoading(false);
-    }
+      const isAuthenticated = localStorage.getItem("authenticated") === "true";
+      const apiKey = localStorage.getItem("api_key");
+      
+      if (!isAuthenticated || !apiKey) {
+          localStorage.removeItem("authenticated"); // Clear any stale auth state
+          router.push("/credentials");
+      } else {
+          setIsLoading(false);
+      }
   }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem("authenticated");
-    router.push("/credentials");
+      localStorage.removeItem("authenticated");
+      localStorage.removeItem("api_key"); // Also remove the API key
+      router.push("/credentials");
   };
 
   const initialDiamondState: DiamondState = {
@@ -67,38 +71,57 @@ const DiamondCalculator = () => {
     setDiamonds(newDiamonds);
   };
 
-  const calculateTotalPrice = async (): Promise<void> => {
+  const calculateTotalPrice = async () => {
     setCalculationLoading(true);
     setError('');
-    
     try {
-      const response = await fetch('http://localhost:8000/api/calculate-price', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          diamonds: diamonds.map(diamond => ({
-            ...diamond,
-            carat: parseFloat(diamond.carat)
-          }))
-        })
-      });
+        const apiKey = localStorage.getItem('api_key');
+        if (!apiKey) {
+            throw new Error('API key not found. Please log in again.');
+        }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to calculate price');
-      }
+        const response = await fetch('http://localhost:8000/api/calculate-price', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}` // Make sure it's in Bearer format
+            },
+            body: JSON.stringify({
+                diamonds: diamonds.map((diamond) => ({
+                    ...diamond,
+                    carat: parseFloat(diamond.carat)
+                }))
+            }),
+            credentials: 'include' // Include credentials in the request
+        });
 
-      const data = await response.json();
-      setTotalPrice(data.total_price);
+        if (response.status === 401) {
+            // Handle unauthorized access
+            localStorage.removeItem('api_key');
+            localStorage.removeItem('authenticated');
+            router.push('/credentials');
+            throw new Error('Session expired. Please log in again.');
+        }
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to calculate price');
+        }
+
+        const data = await response.json();
+        setTotalPrice(data.total_price);
     } catch (error) {
-      console.error('Error calculating price:', error);
-      setError(error instanceof Error ? error.message : 'Failed to calculate price');
+        console.error('Error calculating price:', error);
+        setError(error instanceof Error ? error.message : 'Failed to calculate price');
+        
+        if (error instanceof Error && 
+            (error.message.includes('API key') || error.message.includes('Session expired'))) {
+            router.push('/credentials');
+        }
     } finally {
-      setCalculationLoading(false);
+        setCalculationLoading(false);
     }
-  };
+};
 
   const DiamondInputs = ({ diamond, index, isOnly }: { 
     diamond: DiamondState, 
