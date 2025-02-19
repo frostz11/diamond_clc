@@ -67,7 +67,6 @@ export default function CredentialsPage() {
         }));
     };
 
-    // Log login activity
     const logLoginActivity = async (id: string, branch: string, counter: string, success: boolean, details: string) => {
       try {
           const response = await fetch('http://127.0.0.1:8000/api/log-activity/', {
@@ -91,10 +90,9 @@ export default function CredentialsPage() {
           }
       } catch (error) {
           console.error('Error logging activity:', error);
-          // Don't throw here - we don't want login to fail if logging fails
       }
   };
-    // Fetch login logs
+
     const fetchLoginLogs = async () => {
         if (!isAdmin || id !== "admin") return;
         

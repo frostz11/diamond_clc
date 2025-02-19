@@ -99,7 +99,6 @@ async def logout(
     
     return {"message": "Logged out successfully"}
 
-# 🔹 Protected diamond price calculation
 @router.post("/calculate-price", response_model=DiamondCalculationResponse)
 async def calculate_price(
     request: DiamondCalculationRequest,
@@ -111,7 +110,19 @@ async def calculate_price(
         request.staff_id = staff_id
         individual_prices = []
         
-        for diamond in request.diamonds:
+        # Add validation before calculation
+        for i, diamond in enumerate(request.diamonds):
+            if float(diamond.carat) <= 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Diamond {i+1}: Carat weight must be greater than 0"
+                )
+            if diamond.quantity and diamond.quantity <= 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Diamond {i+1}: Quantity must be greater than 0"
+                )
+            
             price = calculate_diamond_price(diamond)
             individual_prices.append(price)
 
@@ -135,7 +146,7 @@ async def calculate_price(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")

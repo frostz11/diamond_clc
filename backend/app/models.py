@@ -40,7 +40,14 @@ class Diamond(BaseModel):
     clarity: str = Field(..., pattern="^(FL|IF|VVS1|VVS2|VS1|VS2|SI1|SI2|I1)$")
     color: str = Field(..., pattern="^[D-K]$")
     cut: str = Field(..., pattern="^(Excellent|Very Good|Good|Fair|Poor)$")
-    certification: str = Field(..., pattern="^(GIA|AGS|IGI|HRD|None)$")
+    certification: str = Field(
+        ..., 
+        pattern="^(GIA|AGS|IGI|HRD|Others|None)$"
+    )
+    quantity: Optional[int] = Field(default=1, gt=0)
+
+    class Config:
+        from_attributes = True
 
 class DiamondCalculationRequest(BaseModel):
     staff_id: Optional[str] = None
