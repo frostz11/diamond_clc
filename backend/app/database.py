@@ -39,7 +39,6 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         logger.error(f"Failed to set SQLite PRAGMA settings: {str(e)}")
         raise
 
-# Create engine with connection pooling and improved settings
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={
