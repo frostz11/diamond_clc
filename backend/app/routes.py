@@ -171,7 +171,7 @@ async def create_login_log(
             details=log_data.details,
             ip_address=request.client.host,
             user_agent=request.headers.get("user-agent", ""),
-            session_token=log_data.session_token,  # Optional
+            session_token=log_data.session_token, 
             logged_out=log_data.logged_out
         )
         db.add(db_log)
@@ -246,9 +246,9 @@ async def log_activity(request: LogActivityRequest, db: Session = Depends(get_db
             counter=request.counter,
             success=request.success,
             details=request.details,
-            ip_address=None,  # Optional field
-            user_agent=None,  # Optional field
-            session_token=None,  # Optional field
+            ip_address=None,  
+            user_agent=None, 
+            session_token=None, 
             logged_out=False
         )
         db.add(log)
